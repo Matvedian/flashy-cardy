@@ -1,0 +1,256 @@
+---
+alwaysApply: true
+description: Clerk authentication and authorization patterns for secure user data access
+---
+
+# Clerk Authentication & Authorization
+
+This project uses **Clerk** for authentication and authorization. **CRITICAL**: Users must only be able to access their own data. Every database operation and API endpoint must verify user ownership before accessing or modifying data.
+
+## Core Authentication Files
+
+- **Middleware**: [src/middleware.ts](mdc:src/middleware.ts) - Clerk middleware for route protection
+- **Layout**: [src/app/layout.tsx](mdc:src/app/layout.tsx) - ClerkProvider configuration
+- **Queries**: [src/db/queries.ts](mdc:src/db/queries.ts) - Database operations with user verification
+
+## Mandatory Security Rules
+
+### 1. Always Use Clerk's `auth()` Function
+
+For server-side authentication, **ALWAYS** use Clerk's `auth()` function:
+
+```typescript
+import { auth } from "@clerk/nextjs/server";
+
+export async function getUserData() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return []; // For read operations, return empty array
+    // OR throw new Error("Authentication required"); // For write operations
+  }
+  
+  // Proceed with authenticated user operations
+}
+```
+
+**NEVER** skip this check in any server-side function that accesses user data.
+
+### 2. Filter All Database Queries by User ID
+
+**MANDATORY**: Every database query must filter by `userId` to ensure data isolation:
+
+```typescript
+// ✅ CORRECT - Always filter by userId
+export async function getUserDecks(): Promise<Deck[]> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return [];
+  }
+
+  return await db
+    .select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId)); // REQUIRED USER FILTER
+}
+
+// ❌ WRONG - Never access data without user filter
+export async function getAllDecks() {
+  return await db.select().from(decksTable); // SECURITY VIOLATION
+}
+```
+
+### 3. Verify Ownership for Resource Access
+
+When accessing specific resources by ID, **ALWAYS** combine ID and userId filters:
+
+```typescript
+// ✅ CORRECT - Verify user owns the resource
+export async function getDeckById(deckId: string): Promise<Deck | null> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return null;
+  }
+
+  const decks = await db
+    .select()
+    .from(decksTable)
+    .where(and(
+      eq(decksTable.id, deckId),     // Resource ID
+      eq(decksTable.userId, userId)  // REQUIRED: User ownership check
+    ))
+    .limit(1);
+
+  return decks[0] || null;
+}
+```
+
+### 4. API Route Authentication
+
+All API routes must authenticate and authorize users:
+
+```typescript
+// pages/api/decks/route.ts
+import { auth } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function GET(request: NextRequest) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Authentication required" }, 
+      { status: 401 }
+    );
+  }
+  
+  // Proceed with user-specific operations
+  const userDecks = await getUserDecks(); // This function already filters by userId
+  return NextResponse.json(userDecks);
+}
+
+export async function POST(request: NextRequest) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Authentication required" }, 
+      { status: 401 }
+    );
+  }
+  
+  // All database operations will automatically use userId from auth()
+}
+```
+
+### 5. Client-Side Authentication Components
+
+Use Clerk's client components for authentication state:
+
+```tsx
+import { SignedIn, SignedOut, useUser } from "@clerk/nextjs";
+
+export function ProtectedComponent() {
+  return (
+    <>
+      <SignedOut>
+        <div>Please sign in to access this feature</div>
+      </SignedOut>
+      <SignedIn>
+        <div>Protected content for authenticated users</div>
+      </SignedIn>
+    </>
+  );
+}
+
+// For user-specific data in components
+export function UserProfile() {
+  const { user } = useUser();
+  
+  if (!user) {
+    return <div>Loading...</div>;
+  }
+  
+  return <div>Hello, {user.firstName}!</div>;
+}
+```
+
+### 6. Nested Resource Authorization
+
+For nested resources (e.g., flashcards in decks), verify ownership of parent resources:
+
+```typescript
+export async function createFlashcard(deckId: string, front: string, back: string) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error("Authentication required");
+  }
+
+  // CRITICAL: Verify user owns the parent deck
+  const deck = await getDeckById(deckId); // This already checks userId
+  if (!deck) {
+    throw new Error("Deck not found or access denied");
+  }
+
+  // Proceed with creating flashcard
+  return await db.insert(flashcardsTable).values({
+    deckId,
+    front,
+    back,
+  }).returning();
+}
+```
+
+## Security Checklist
+
+Before implementing any data access operation:
+
+- [ ] **Authentication**: Does the function call `auth()` and check `userId`?
+- [ ] **Authorization**: Does the query filter by `userId` or verify resource ownership?
+- [ ] **Error Handling**: Does it return appropriate errors/empty data for unauthenticated users?
+- [ ] **API Routes**: Are API endpoints protected with authentication checks?
+- [ ] **Client Components**: Are UI components properly handling signed-in/signed-out states?
+
+## Forbidden Practices
+
+**NEVER DO:**
+
+- ❌ Access database without checking `userId`
+- ❌ Use user-provided `userId` instead of `auth()` result
+- ❌ Skip authentication checks in API routes
+- ❌ Trust client-side user information for server operations
+- ❌ Allow cross-user data access through URL manipulation
+- ❌ Return other users' data, even by accident
+
+## Error Handling Patterns
+
+### Read Operations (Safe Fallbacks)
+
+```typescript
+// Return empty arrays/null for failed authentication
+if (!userId) {
+  return []; // or return null;
+}
+```
+
+### Write Operations (Throw Errors)
+
+```typescript
+// Throw errors for operations that require authentication
+if (!userId) {
+  throw new Error("Authentication required");
+}
+```
+
+### API Routes (HTTP Status Codes)
+
+```typescript
+// Return proper HTTP status codes
+if (!userId) {
+  return NextResponse.json(
+    { error: "Authentication required" }, 
+    { status: 401 }
+  );
+}
+```
+
+## Key Security Principles
+
+1. **Zero Trust**: Never trust client-side data for authentication/authorization
+2. **Defense in Depth**: Check authentication at multiple layers (middleware, API routes, database queries)
+3. **Least Privilege**: Users can only access their own data, nothing more
+4. **Fail Secure**: When in doubt, deny access rather than allow it
+5. **Audit Trail**: User actions are always tied to authenticated `userId`
+
+## Integration with Database Rules
+
+This rule works in conjunction with [database-interactions.mdc](mdc:.cursor/rules/database-interactions.mdc). Every database query function should:
+
+1. **First**: Check authentication using `auth()`
+2. **Then**: Use Drizzle ORM patterns with user filtering
+3. **Always**: Ensure `userId` is included in where clauses
+
+**Remember**: User data security is not optional. Every line of code that touches user data must verify the user's identity and authorization to access that specific data.

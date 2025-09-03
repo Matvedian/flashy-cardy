@@ -1,0 +1,96 @@
+---
+alwaysApply: true
+description: "shadcn/ui component library usage guidelines"
+---
+
+# shadcn/ui Component Library Guidelines
+
+This project uses **shadcn/ui** for all UI components. shadcn/ui provides beautifully designed, accessible, and customizable components built on top of Radix UI and Tailwind CSS.
+
+## Project Setup
+
+### Initialize shadcn/ui (if not already done)
+
+If shadcn/ui is not initialized in the project (no `components.json` file exists), run:
+
+```bash
+npx shadcn@latest init
+```
+
+This will:
+
+- Create a `components.json` configuration file
+- Set up the `src/components/ui` directory structure
+- Configure Tailwind CSS integration
+- Set up utility functions
+
+### Adding Components
+
+When you need a specific component that isn't installed, use:
+
+```bash
+npx shadcn@latest add [component-name]
+```
+
+**Examples:**
+
+```bash
+npx shadcn@latest add button
+npx shadcn@latest add input
+npx shadcn@latest add card
+npx shadcn@latest add dialog
+npx shadcn@latest add table
+```
+
+## Usage Guidelines
+
+### 1. Always Use shadcn/ui Components
+
+- **DO NOT** create custom UI components from scratch
+- **DO NOT** use other UI libraries (Material-UI, Chakra UI, etc.)
+- **ALWAYS** check if a shadcn/ui component exists for your needs first
+
+### 2. Component Import Pattern
+
+```tsx
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+```
+
+### 3. Customization
+
+- Use the `className` prop for additional Tailwind CSS classes
+- Modify component variants through the established variant system
+- For major customizations, copy and modify the component in `src/components/ui/`
+
+### 4. Common Components to Add
+
+Most projects need these core components:
+
+- `button` - For all interactive buttons
+- `input` - For form inputs
+- `card` - For content containers
+- `dialog` - For modals and overlays
+- `form` - For form handling with validation
+- `table` - For data tables
+- `avatar` - For user avatars
+- `badge` - For status indicators
+- `tabs` - For tabbed interfaces
+
+## Key Files
+
+- **Configuration**: `components.json` (created after init)
+- **Components**: `src/components/ui/` directory
+- **Styles**: [globals.css](mdc:src/app/globals.css) for global Tailwind styles
+- **Layout**: [layout.tsx](mdc:src/app/layout.tsx) for app-wide layout
+- **Package**: [package.json](mdc:package.json) for dependencies
+
+## Before Building UI
+
+1. Check if the component exists in shadcn/ui documentation
+2. Install the component if needed: `npx shadcn@latest add [component]`
+3. Import and use the component with proper TypeScript types
+4. Apply custom styling through `className` prop using Tailwind CSS
+
+Remember: shadcn/ui components are designed to be copied into your project, giving you full control while maintaining consistency and accessibility.

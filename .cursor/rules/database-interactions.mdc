@@ -1,0 +1,155 @@
+---
+alwaysApply: true
+description: Database interactions must always use Drizzle schema and queries
+---
+
+# Database Interactions with Drizzle ORM
+
+This project uses **Drizzle ORM** for all database interactions. All database operations must follow the established patterns and use the centralized schema and connection.
+
+## Core Database Files
+
+- **Schema**: [src/db/schema.ts](mdc:src/db/schema.ts) - Contains all table definitions and types
+- **Connection**: [src/db/index.ts](mdc:src/db/index.ts) - Database connection using Neon
+- **Queries**: [src/db/queries.ts](mdc:src/db/queries.ts) - Centralized query functions
+
+## Mandatory Rules
+
+### 1. Always Use the Central Database Connection
+
+```typescript
+import { db } from "@/db/index";
+```
+
+**Never** create direct database connections elsewhere in the codebase.
+
+### 2. Use Schema Table Definitions
+
+All table references must import from the schema:
+
+```typescript
+import { decksTable, flashcardsTable, studySessionsTable } from "@/db/schema";
+```
+
+**Never** use raw SQL table names or create table definitions elsewhere.
+
+### 3. Use Schema Types for Type Safety
+
+Import and use the inferred types for all database operations:
+
+```typescript
+import type { 
+  InsertDeck, SelectDeck,
+  InsertFlashcard, SelectFlashcard,
+  InsertStudySession, SelectStudySession 
+} from "@/db/schema";
+```
+
+### 4. Follow Established Query Patterns
+
+**Example: Select with User Authentication**
+```typescript
+export async function getUserDecks(): Promise<SelectDeck[]> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return [];
+  }
+
+  return await db
+    .select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+}
+```
+
+**Example: Insert with Return**
+```typescript
+export async function createDeck(title: string, description?: string): Promise<SelectDeck> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error("Authentication required");
+  }
+
+  const [newDeck] = await db
+    .insert(decksTable)
+    .values({ title, description, userId })
+    .returning();
+  
+  return newDeck;
+}
+```
+
+### 5. User Data Access Control
+
+**Always verify user ownership** for data access:
+
+```typescript
+// Verify user owns the resource
+const deck = await getDeckById(deckId);
+if (!deck) {
+  throw new Error("Deck not found or access denied");
+}
+```
+
+Use `and()` for combining conditions:
+```typescript
+.where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)))
+```
+
+### 6. Use Drizzle Query Operators
+
+Import and use Drizzle's query operators:
+
+```typescript
+import { eq, and, or, count, desc, asc } from "drizzle-orm";
+```
+
+**Never** write raw SQL unless absolutely necessary.
+
+### 7. Handle Relations Properly
+
+When working with related data, use the established relations from [schema.ts](mdc:src/db/schema.ts):
+
+```typescript
+// Use relations for joins when needed
+const decksWithCards = await db.query.decksTable.findMany({
+  where: eq(decksTable.userId, userId),
+  with: {
+    flashcards: true,
+  },
+});
+```
+
+## Database Operations Checklist
+
+Before implementing any database operation:
+
+- [ ] Is there an existing query function in [queries.ts](mdc:src/db/queries.ts)?
+- [ ] Am I using the correct table from [schema.ts](mdc:src/db/schema.ts)?
+- [ ] Am I using the `db` connection from [index.ts](mdc:src/db/index.ts)?
+- [ ] Have I implemented proper user authentication/authorization?
+- [ ] Am I using TypeScript types from the schema?
+- [ ] Am I following the established error handling patterns?
+
+## Forbidden Practices
+
+**DO NOT:**
+- Create direct database connections outside of [src/db/index.ts](mdc:src/db/index.ts)
+- Write raw SQL queries (use Drizzle query builder)
+- Define table schemas outside of [src/db/schema.ts](mdc:src/db/schema.ts)
+- Skip user authentication for data access
+- Use `any` types instead of schema-inferred types
+- Access data without proper ownership verification
+
+## Adding New Database Operations
+
+1. **Add to [queries.ts](mdc:src/db/queries.ts)** - Don't scatter database logic across components
+2. **Follow naming conventions** - `getUserX`, `createX`, `updateX`, `deleteX`
+3. **Include proper TypeScript types** - Use schema-inferred types
+4. **Add authentication checks** - Verify user permissions
+5. **Handle errors gracefully** - Return null/empty arrays vs throwing when appropriate
+6. **Update related counts/timestamps** - Maintain data consistency
+
+This ensures all database interactions are secure, type-safe, and maintainable.
