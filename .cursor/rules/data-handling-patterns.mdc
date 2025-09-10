@@ -1,310 +1,142 @@
 ---
 alwaysApply: true
 ---
-
-# Data Handling Patterns with Server Components, Server Actions, and Zod Validation
-
-This project follows strict patterns for data handling to ensure type safety, validation, and proper separation of concerns in Next.js 13+ App Router.
-
-## Core Principles
-
-### 1. Data Retrieval: Server Components Only
-
-**MANDATORY**: All data fetching must be done in Server Components, never in Client Components.
-
-```typescript
-// ✅ CORRECT - Server Component data fetching
-import { getUserDecks } from "@/db/queries";
-
-export default async function DashboardPage() {
-  const decks = await getUserDecks(); // Direct database query in Server Component
-  
-  return (
-    <div>
-      {decks.map(deck => (
-        <DeckCard key={deck.id} deck={deck} />
-      ))}
-    </div>
-  );
-}
-
-// ❌ WRONG - Client Component data fetching
-"use client";
-import { useEffect, useState } from "react";
-
-export default function DashboardPage() {
-  const [decks, setDecks] = useState([]);
-  
-  useEffect(() => {
-    fetch('/api/decks') // Never fetch in Client Components
-      .then(res => res.json())
-      .then(setDecks);
-  }, []);
-  
-  return <div>{/* render */}</div>;
-}
-```
-
-**Key Rules:**
-
-- Server Components can directly import and call database query functions from [src/db/queries.ts](mdc:src/db/queries.ts)
-- Never use `fetch()`, `useEffect()`, or state for data retrieval in Client Components
-- Pass data down from Server Components to Client Components via props
-- If you need dynamic data fetching, use Server Actions with revalidation
-
-### 2. Data Mutations: Server Actions Only
-
-**MANDATORY**: All create, update, and delete operations must use Server Actions, never API routes or client-side fetching.
-
-```typescript
-// ✅ CORRECT - Server Action for mutations
-"use server";
-
-import { z } from "zod";
-import { createDeck } from "@/db/queries";
-import { revalidatePath } from "next/cache";
-
-const CreateDeckSchema = z.object({
-  title: z.string().min(1, "Title is required").max(100, "Title too long"),
-  description: z.string().optional(),
 });
 
-type CreateDeckInput = z.infer<typeof CreateDeckSchema>;
-
-export async function createDeckAction(input: CreateDeckInput) {
-  const validatedInput = CreateDeckSchema.parse(input);
+export async function updateDeckAction(input: UpdateDeckInput) {
+  // Validate in Server Action
+  const validatedInput = UpdateDeckSchema.parse(input);
   
-  const newDeck = await createDeck(validatedInput.title, validatedInput.description);
-  
-  revalidatePath("/dashboard");
-  return { success: true, deck: newDeck };
-}
-
-// ❌ WRONG - API route for mutations
-export async function POST(request: Request) {
-  const body = await request.json(); // Should use Server Actions instead
-  // ... mutation logic
-}
-
-// ❌ WRONG - Client-side mutation
-"use client";
-export function CreateDeckForm() {
-  const handleSubmit = async (formData: FormData) => {
-    await fetch('/api/decks', { // Never use fetch for mutations
-      method: 'POST',
-      body: formData
-    });
-  };
-}
-```
-
-**Key Rules:**
-
-- Always mark Server Action files with `"use server";` directive
-- Import database functions from [src/db/queries.ts](mdc:src/db/queries.ts)
-- Use `revalidatePath()` or `revalidateTag()` after mutations
-- Return structured results with success/error states
-- Never use API routes for CRUD operations
-
-### 3. Zod Validation: Mandatory for All Data
-
-**MANDATORY**: Every piece of data entering the system must be validated using Zod schemas.
-
-```typescript
-// ✅ CORRECT - Zod validation patterns
-import { z } from "zod";
-
-// Define schema for validation
-const UpdateFlashcardSchema = z.object({
-  id: z.string().uuid("Invalid flashcard ID"),
-  front: z.string().min(1, "Front text is required").max(500, "Front text too long"),
-  back: z.string().min(1, "Back text is required").max(500, "Back text too long"),
-  deckId: z.string().uuid("Invalid deck ID"),
-});
-
-type UpdateFlashcardInput = z.infer<typeof UpdateFlashcardSchema>;
-
-export async function updateFlashcardAction(input: UpdateFlashcardInput) {
-  // Always validate input
-  const validatedInput = UpdateFlashcardSchema.parse(input);
-  
-  // Use validated data
-  const updatedCard = await updateFlashcard(
-    validatedInput.id,
-    validatedInput.front,
-    validatedInput.back
+  // Pass clean, validated data to helper
+  const updatedDeck = await updateDeck(
+    validatedInput.deckId,
+    validatedInput.title,
+    validatedInput.description
   );
   
-  revalidatePath(`/dashboard/decks/${validatedInput.deckId}`);
-  return { success: true, flashcard: updatedCard };
-}
-
-// ❌ WRONG - No validation
-export async function updateFlashcardAction(input: any) {
-  // Never skip validation
-  const updatedCard = await updateFlashcard(input.id, input.front, input.back);
-  return updatedCard;
-}
-```
-
-**Validation Rules:**
-
-- Create Zod schemas for all input data structures
-- Use `z.infer<typeof Schema>` to generate TypeScript types
-- Always call `schema.parse()` or `schema.safeParse()` before using data
-- Define validation schemas near the Server Actions that use them
-- Include meaningful error messages in Zod schemas
-
-### 4. TypeScript Types: No FormData, Always Typed
-
-**MANDATORY**: Server Actions must accept properly typed parameters, never raw `FormData`.
-
-```typescript
-// ✅ CORRECT - Typed Server Action parameters
-const CreateStudySessionSchema = z.object({
-  deckId: z.string().uuid(),
-  duration: z.number().min(1).max(7200), // 1 second to 2 hours
-  cardsStudied: z.number().min(0),
-  correctAnswers: z.number().min(0),
-});
-
-type CreateStudySessionInput = z.infer<typeof CreateStudySessionSchema>;
-
-export async function createStudySessionAction(input: CreateStudySessionInput) {
-  const validatedInput = CreateStudySessionSchema.parse(input);
-  // ... implementation
-}
-
-// ❌ WRONG - Using FormData directly
-export async function createStudySessionAction(formData: FormData) {
-  const deckId = formData.get('deckId') as string; // Type unsafe
-  const duration = Number(formData.get('duration')); // No validation
-  // ... implementation
-}
-
-// ❌ WRONG - Untyped parameters
-export async function createStudySessionAction(data: any) {
-  // No type safety or validation
-}
-```
-
-**Type Safety Rules:**
-
-- Always define TypeScript interfaces/types for Server Action parameters
-- Use `z.infer<typeof Schema>` to derive types from Zod schemas
-- Never use `FormData` as a parameter type for Server Actions
-- Never use `any` type for data parameters
-- Convert form data to typed objects before passing to Server Actions
-
-### 5. Client Component Integration
-
-**How Client Components should interact with Server Actions:**
-
-```typescript
-// ✅ CORRECT - Client Component calling Server Action
-"use client";
-
-import { createDeckAction } from "@/actions/deck-actions";
-import { useState } from "react";
-
-export function CreateDeckForm() {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (formData: FormData) => {
-    setIsLoading(true);
-    
-    try {
-      // Convert FormData to typed object
-      const input = {
-        title: formData.get('title') as string,
-        description: formData.get('description') as string || undefined,
-      };
-      
-      // Call Server Action with typed data
-      const result = await createDeckAction(input);
-      
-      if (result.success) {
-        // Handle success
-      }
-    } catch (error) {
-      // Handle validation or other errors
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <form action={handleSubmit}>
-      <input name="title" required />
-      <textarea name="description" />
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Creating...' : 'Create Deck'}
-      </button>
-    </form>
-  );
-}
-```
-
-### 6. Error Handling Patterns
-
-**Consistent error handling across all data operations:**
-
-```typescript
-// ✅ CORRECT - Proper error handling
-export async function deleteFlashcardAction(input: { id: string; deckId: string }) {
-  try {
-    const validatedInput = DeleteFlashcardSchema.parse(input);
-    
-    await deleteFlashcard(validatedInput.id);
-    
-    revalidatePath(`/dashboard/decks/${validatedInput.deckId}`);
-    return { success: true };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { success: false, error: "Invalid input data", details: error.errors };
-    }
-    
-    return { success: false, error: "Failed to delete flashcard" };
+  if (updatedDeck) {
+    revalidatePath("/dashboard");
+    return { success: true, deck: updatedDeck };
   }
+  
+  return { success: false, error: "Failed to update deck" };
+}
+
+// ❌ WRONG - Validation in query helper
+export async function updateDeck(input: any) {
+  // Query helpers should not handle validation
+  const validatedInput = UpdateDeckSchema.parse(input);
+}
+```
+
+### 6. Benefits of Centralized Query Helpers
+
+**Why this pattern is mandatory:**
+
+1. **Security**: Authentication and authorization are handled once in the helper
+2. **Consistency**: All database operations follow the same patterns
+3. **Maintainability**: Business logic is centralized and reusable
+4. **Type Safety**: Query results are properly typed across the application
+5. **Data Integrity**: Related operations (like updating card counts) are handled automatically
+6. **Testing**: Database operations can be mocked/tested in isolation
+7. **Performance**: Query optimization happens in one place
+
+### 7. Adding New Database Operations
+
+When adding new functionality:
+
+1. **Add helper function to [src/db/queries.ts](mdc:src/db/queries.ts)** first
+2. **Follow established naming**: `getUserX`, `createX`, `updateX`, `deleteX`
+3. **Include authentication checks** using Clerk's `auth()`
+4. **Verify ownership** for resource-specific operations
+5. **Handle related updates** (e.g., card counts, timestamps)
+6. **Use proper return types** from schema definitions
+7. **Add JSDoc comments** explaining the function's purpose
+
+```typescript
+/**
+ * Create a new study session for a deck owned by the current user
+ */
+export async function createStudySession(
+  deckId: string, 
+  duration: number, 
+  cardsStudied: number, 
+  correctAnswers: number
+): Promise<StudySession> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error("Authentication required to create study session");
+  }
+
+  // Verify user owns the deck
+  const deck = await getDeckById(deckId);
+  if (!deck) {
+    throw new Error("Deck not found or access denied");
+  }
+
+  const [newSession] = await db
+    .insert(studySessionsTable)
+    .values({
+      deckId,
+      userId, // Always include userId for new records
+      duration,
+      cardsStudied,
+      correctAnswers,
+    })
+    .returning();
+  
+  return newSession;
 }
 ```
 
 ## File Organization
 
-- **Server Actions**: Create in `src/actions/` directory (e.g., `deck-actions.ts`, `flashcard-actions.ts`)
-- **Zod Schemas**: Define alongside Server Actions or in separate `schemas.ts` files
-- **Database Queries**: Keep in [src/db/queries.ts](mdc:src/db/queries.ts) with proper authentication
-- **Types**: Auto-generate from Zod schemas using `z.infer<typeof Schema>`
+- **Query Helpers**: [src/db/queries.ts](mdc:src/db/queries.ts) - All database operations
+- **Server Actions**: Create in `src/actions/` directory (e.g., `deck-actions.ts`)
+- **Zod Schemas**: Define alongside Server Actions
+- **Server Components**: Import and call query helpers directly
+- **Database Schema**: [src/db/schema.ts](mdc:src/db/schema.ts) - Table definitions only
 
 ## Security Integration
 
-All data handling must work with the authentication patterns defined in the Clerk authentication rules:
+All query helpers automatically integrate with Clerk authentication:
 
-- Server Actions must call `auth()` and verify `userId`
-- Database queries must filter by authenticated user
-- Validate ownership before mutations
-- Never trust client-provided user identifiers
+- Every helper calls `auth()` and verifies `userId`
+- Read operations return empty arrays/null for unauthenticated users
+- Write operations throw errors for unauthenticated users
+- Resource access verifies ownership through helper functions
+- User data is always filtered by `userId`
 
 ## Checklist for All Data Operations
 
-- [ ] **Retrieval**: Using Server Component with direct database query?
-- [ ] **Mutations**: Using Server Action (not API route)?
-- [ ] **Validation**: Zod schema defined and applied?
-- [ ] **Types**: TypeScript types derived from Zod schemas?
-- [ ] **Authentication**: User verification implemented?
-- [ ] **Revalidation**: Cache invalidation after mutations?
-- [ ] **Error Handling**: Proper error boundaries and user feedback?
+- [ ] **Query Helper**: Is there a helper function in [src/db/queries.ts](mdc:src/db/queries.ts)?
+- [ ] **Server Component**: Does it call the query helper directly?
+- [ ] **Server Action**: Does it call the query helper (not direct DB access)?
+- [ ] **Validation**: Is Zod validation in Server Action only?
+- [ ] **Authentication**: Does helper verify `userId` from `auth()`?
+- [ ] **Authorization**: Does helper check resource ownership?
+- [ ] **Revalidation**: Does Server Action call `revalidatePath()`?
 
 ## Forbidden Patterns
 
 **NEVER DO:**
 
-- ❌ Data fetching in Client Components (`useEffect`, `fetch`)
-- ❌ API routes for CRUD operations (use Server Actions)
-- ❌ Skip Zod validation for any input data
-- ❌ Use `FormData` as Server Action parameter type
-- ❌ Use `any` type for data parameters
-- ❌ Direct database calls from Client Components
-- ❌ Mutations without proper revalidation
+- ❌ Direct database access outside of [src/db/queries.ts](mdc:src/db/queries.ts)
+- ❌ Data fetching in Client Components (`useEffect`, `fetch`, `useState`)
+- ❌ API routes for CRUD operations (use Server Actions + query helpers)
+- ❌ Skip query helpers for "performance" or "simplicity"
+- ❌ Duplicate database logic across Server Actions
+- ❌ Authentication checks outside of query helpers
+- ❌ Direct imports of `db`, `schema` outside of queries.ts
 
-**Remember**: This pattern ensures type safety, validation, and optimal performance in the Next.js App Router architecture while maintaining security through proper authentication.
+## Migration Path
+
+If you find direct database access in the codebase:
+
+1. **Create helper function** in [src/db/queries.ts](mdc:src/db/queries.ts) with proper auth/validation
+2. **Replace direct access** with helper function call
+3. **Test the migration** to ensure same functionality
+4. **Remove unused imports** (`db`, schema tables) from migrated files
+
+**Remember**: The `db/queries` directory is the single source of truth for all database operations. Every piece of data that enters or leaves the database must go through these centralized helper functions to ensure security, consistency, and maintainability.

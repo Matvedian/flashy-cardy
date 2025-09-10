@@ -1,8 +1,6 @@
 ---
 alwaysApply: true
-description: Clerk authentication and authorization patterns for secure user data access
 ---
-
 # Clerk Authentication & Authorization
 
 This project uses **Clerk** for authentication and authorization. **CRITICAL**: Users must only be able to access their own data. Every database operation and API endpoint must verify user ownership before accessing or modifying data.

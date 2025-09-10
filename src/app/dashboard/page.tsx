@@ -1,159 +1,80 @@
 import { getUserDecks } from "@/db/queries";
-import { auth } from "@clerk/nextjs/server";
-import { Protect } from "@clerk/nextjs";
-import { Deck } from "@/lib/types";
-import { redirect } from "next/navigation";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { FileText, Crown } from "lucide-react";
 import Link from "next/link";
-import { CreateDeckDialog } from "./components/CreateDeckDialog";
 
 export default async function DashboardPage() {
-  // Check authentication first
-  const { userId, has } = await auth();
-  
-  if (!userId) {
-    redirect("/");
-  }
-
-  // Fetch user-specific decks using centralized query function
-  const userDecks = await getUserDecks();
-
-  // Check user's billing status
-  const hasUnlimitedDecks = has({ feature: "unlimited_decks" });
-  const hasThreeDeckLimit = has({ feature: "3_deck_limit" });
-
-  const deckCount = userDecks.length;
-  const isAtFreeLimit = hasThreeDeckLimit && deckCount >= 3;
-  const isNearFreeLimit = hasThreeDeckLimit && deckCount >= 2;
+  const decks = await getUserDecks();
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-              <p className="text-muted-foreground">
-                Manage your flashcard decks and study progress
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {hasUnlimitedDecks && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Crown className="h-3 w-3" />
-                  Pro Plan - {deckCount} decks
-                </Badge>
-              )}
-              {hasThreeDeckLimit && (
-                <Badge variant="outline">{deckCount}/3 decks</Badge>
-              )}
-            </div>
+    <div className="min-h-screen bg-background">
+      <SignedOut>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-semibold text-foreground">
+              Please sign in to access your dashboard
+            </h1>
+            <SignInButton mode="modal">
+              <Button size="lg">Sign In</Button>
+            </SignInButton>
           </div>
         </div>
+      </SignedOut>
 
-        {/* Upgrade prompt for free users near limit */}
-        {isNearFreeLimit && !isAtFreeLimit && (
-          <Alert className="mb-6">
-            <Crown className="h-4 w-4" />
-            <AlertDescription>
-              You&apos;re using {deckCount} of 3 free decks.
-              <Button variant="link" className="p-0 h-auto ml-1" asChild>
-                <Link href="/pricing">Upgrade to Pro</Link>
-              </Button>{" "}
-              for unlimited decks and AI flashcard generation.
-            </AlertDescription>
-          </Alert>
-        )}
+      <SignedIn>
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground">Manage your flashcard decks</p>
+            </div>
+            <Button size="lg">
+              Create New Deck
+            </Button>
+          </div>
 
-        {/* Limit reached warning */}
-        {isAtFreeLimit && (
-          <Alert className="mb-6">
-            <Crown className="h-4 w-4" />
-            <AlertDescription>
-              You&apos;ve reached the limit of 3 decks on the free plan.
-              <Button variant="link" className="p-0 h-auto ml-1" asChild>
-                <Link href="/pricing">Upgrade to Pro</Link>
-              </Button>{" "}
-              to create unlimited decks.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {userDecks.length > 0 ? (
-            userDecks.map((deck: Deck) => (
-              <Link key={deck.id} href={`/decks/${deck.id}`} className="block">
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col">
-                  <CardHeader className="flex-grow">
-                    <CardTitle className="text-xl">{deck.title}</CardTitle>
-                    <CardDescription className="min-h-[20px]">
-                      {deck.description || "No description"}
-                    </CardDescription>
-                  </CardHeader>
-                  <Separator />
-                  <CardContent className="pt-4 mt-auto">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span>{deck.cardCount} card{deck.cardCount !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div>
-                        Last updated:{" "}
-                        {new Date(deck.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))
+          {decks.length === 0 ? (
+            <div className="text-center py-12">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                No decks yet
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                Create your first flashcard deck to get started!
+              </p>
+              <Button>Create Your First Deck</Button>
+            </div>
           ) : (
-            <div className="col-span-full">
-              <Card className="text-center py-12">
-                <CardContent className="pt-6">
-                  <div className="text-muted-foreground mb-4">
-                    <FileText className="mx-auto h-12 w-12" />
-                  </div>
-                  <CardTitle className="text-lg mb-2">No decks yet</CardTitle>
-                  <CardDescription className="mb-6">
-                    Get started by creating your first flashcard deck
-                  </CardDescription>
-                  <CreateDeckDialog size="lg" />
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {decks.map((deck) => (
+                <Link href={`/decks/${deck.id}`} key={deck.id}>
+                  <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-lg">{deck.title}</CardTitle>
+                        <Badge variant="secondary">
+                          {deck.cardCount} {deck.cardCount === 1 ? 'card' : 'cards'}
+                        </Badge>
+                      </div>
+                      {deck.description && (
+                        <CardDescription className="line-clamp-2">
+                          {deck.description}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created {new Date(deck.createdAt).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
             </div>
           )}
         </div>
-
-        {userDecks.length > 0 && (
-          <div className="mt-8 text-center">
-            <Protect
-              feature="unlimited_decks"
-              fallback={
-                isAtFreeLimit ? (
-                  <Button disabled variant="outline" size="lg">
-                    Upgrade to create more decks
-                  </Button>
-                ) : (
-                  <CreateDeckDialog size="lg" variant="outline" />
-                )
-              }
-            >
-              <CreateDeckDialog size="lg" variant="outline" />
-            </Protect>
-          </div>
-        )}
-      </div>
+      </SignedIn>
     </div>
   );
 }

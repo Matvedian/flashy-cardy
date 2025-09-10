@@ -10,6 +10,7 @@ import {
 } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -51,14 +52,30 @@ export default function RootLayout({
           footerActionLink: "text-primary hover:text-primary/90",
         }
       }}
+      afterSignInUrl="/dashboard"
+      afterSignUpUrl="/dashboard"
     >
       <html lang="en" className="dark">
         <body className={`${poppins.variable} antialiased`}>
           <header className="border-b border-gray-800 bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center h-16">
-                <div className="flex-shrink-0">
-                  <h1 className="text-xl font-semibold text-white">Flashy Cardy</h1>
+                <div className="flex items-center space-x-8">
+                  <Link href="/" className="flex-shrink-0">
+                    <h1 className="text-xl font-semibold text-white hover:text-gray-300 transition-colors">
+                      Flashy Cardy
+                    </h1>
+                  </Link>
+                  <SignedIn>
+                    <nav className="hidden sm:flex space-x-4">
+                      <Link 
+                        href="/dashboard" 
+                        className="text-gray-300 hover:text-white transition-colors font-medium"
+                      >
+                        Dashboard
+                      </Link>
+                    </nav>
+                  </SignedIn>
                 </div>
                 <div className="flex items-center space-x-4">
                   <SignedOut>
