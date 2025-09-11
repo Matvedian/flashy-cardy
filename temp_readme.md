@@ -42,6 +42,9 @@ CLERK_SECRET_KEY=sk_test_your_secret_key_here
 
 # Database connection (required for flashcard storage)
 DATABASE_URL=your_database_connection_string_here
+
+# Database connection (required for flashcard storage)
+DATABASE_URL=your_database_connection_string_here
 ```
 
 ⚠️ **Important**: Replace the placeholder values with your actual Clerk and database credentials.
@@ -63,7 +66,7 @@ The app includes **completely free translation** for language learning flashcard
 ```bash
 npm run dev
 # or
-yarn dev  
+yarn dev
 # or
 pnpm dev
 # or
@@ -72,32 +75,41 @@ bun dev
 
 5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## How to Use
+## Authentication Flow
 
-1. **Sign up/Sign in** using Clerk authentication
-2. **Create flashcard decks** organized by topic or subject
-3. **Add flashcards** with front and back content
-4. **Use auto-translation** - Toggle "AI Assistance" when creating cards to automatically translate between languages
-5. **Study your decks** with the smart study system
-6. **Track your progress** with built-in analytics
+When you click "Get Started" or sign-in buttons, you'll be redirected to Clerk's hosted authentication pages. This is normal behavior:
 
-## Tech Stack
+1. **Sign In/Up**: Redirects to `https://[your-clerk-subdomain].accounts.dev/sign-in`
+2. **After Authentication**: Returns to `/dashboard` (configured in `src/app/layout.tsx`)
+3. **Protected Routes**: Middleware automatically protects routes that require authentication
 
-- **Framework**: Next.js 14 (App Router)
-- **Database**: PostgreSQL with Drizzle ORM  
-- **Authentication**: Clerk
-- **UI Components**: shadcn/ui + Tailwind CSS
-- **Translation**: MyMemory API (free)
-- **Deployment**: Vercel-ready
+## Troubleshooting
 
-## Contributing
+### "Authentication redirect not working"
+- Ensure your `.env.local` file has the correct Clerk API keys
+- Check that your Clerk application is configured with the correct domains
+- Verify that `afterSignInUrl` and `afterSignUpUrl` are set correctly in `ClerkProvider`
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### "Cannot access dashboard"
+- Make sure you're signed in through Clerk's authentication flow
+- Check browser console for any JavaScript errors
+- Verify that database connection is working (if applicable)
 
-## License
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project is open source and available under the [MIT License](LICENSE).
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Poppins](https://fonts.google.com/specimen/Poppins), a clean and modern font family from Google Fonts.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
