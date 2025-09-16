@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, BookOpen, Calendar, Edit } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Plus, BookOpen, Calendar } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddFlashcardDialog } from "@/components/AddFlashcardDialog";
 import { EditFlashcardDialog } from "@/components/EditFlashcardDialog";
+import { EditDeckDialog } from "@/components/EditDeckDialog";
+import { DeleteFlashcardButton } from "@/components/DeleteFlashcardButton";
 
 interface DeckPageProps {
   params: Promise<{
@@ -61,7 +64,17 @@ export default async function DeckPage({ params }: DeckPageProps) {
           <div className="space-y-4">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-foreground">{deck.title}</h1>
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-3xl font-bold text-foreground">{deck.title}</h1>
+                  <EditDeckDialog
+                    deck={deck}
+                    trigger={
+                      <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                        Edit
+                      </Button>
+                    }
+                  />
+                </div>
                 {deck.description && (
                   <p className="text-lg text-muted-foreground">{deck.description}</p>
                 )}
@@ -76,14 +89,28 @@ export default async function DeckPage({ params }: DeckPageProps) {
 
             {/* Deck Meta Information */}
             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
-                <span>Created {new Date(deck.createdAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
-                <span>Updated {new Date(deck.updatedAt).toLocaleDateString()}</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center space-x-1 cursor-default">
+                    <Calendar className="w-4 h-4" />
+                    <span>Created {new Date(deck.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Date Created</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center space-x-1 cursor-default">
+                    <Calendar className="w-4 h-4" />
+                    <span>Updated {new Date(deck.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Date Updated</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             <Separator />
@@ -132,21 +159,31 @@ export default async function DeckPage({ params }: DeckPageProps) {
                           Card {index + 1}
                         </Badge>
                         <div className="flex items-center space-x-2">
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(flashcard.createdAt).toLocaleDateString()}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="text-xs text-muted-foreground cursor-default">
+                                {new Date(flashcard.createdAt).toLocaleDateString()}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Date Created</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <div className="flex items-center space-x-1">
+                            <EditFlashcardDialog
+                              flashcard={flashcard}
+                              trigger={
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-xs h-6 px-2"
+                                >
+                                  Edit
+                                </Button>
+                              }
+                            />
+                            <DeleteFlashcardButton flashcard={flashcard} />
                           </div>
-                          <EditFlashcardDialog
-                            flashcard={flashcard}
-                            trigger={
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-xs h-6 px-2"
-                              >
-                                Edit
-                              </Button>
-                            }
-                          />
                         </div>
                       </div>
                     </CardHeader>

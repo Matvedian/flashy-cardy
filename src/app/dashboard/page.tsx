@@ -3,6 +3,7 @@ import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -64,9 +65,16 @@ export default async function DashboardPage() {
                       )}
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created {new Date(deck.createdAt).toLocaleDateString()}
-                      </p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-sm text-muted-foreground cursor-default">
+                            Created {new Date(deck.createdAt).toLocaleDateString()}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Date Created</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </CardContent>
                   </Card>
                 </Link>

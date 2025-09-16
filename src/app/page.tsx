@@ -18,7 +18,7 @@ export default async function HomePage() {
         <div className="text-center space-y-8">
           <div className="space-y-4">
             <h1 className="text-4xl md:text-6xl font-bold text-foreground">
-              Master Your Learning with <span className="text-primary">Flashy Cardy</span>
+              Master Your Learning with <span className="text-primary">Flash Cards</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Create, organize, and study flashcards efficiently. Track your progress and 

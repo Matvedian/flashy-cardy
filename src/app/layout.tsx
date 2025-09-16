@@ -63,7 +63,7 @@ export default function RootLayout({
                 <div className="flex items-center space-x-8">
                   <Link href="/" className="flex-shrink-0">
                     <h1 className="text-xl font-semibold text-white hover:text-gray-300 transition-colors">
-                      Flashy Cardy
+                      Flash Cards
                     </h1>
                   </Link>
                   <SignedIn>
