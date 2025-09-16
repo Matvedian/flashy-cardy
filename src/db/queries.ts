@@ -162,6 +162,100 @@ export async function getDeckFlashcards(deckId: string) {
 }
 
 /**
+ * Get a specific flashcard by ID (with ownership verification)
+ */
+export async function getFlashcardById(flashcardId: string) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return null;
+  }
+
+  const [flashcard] = await db
+    .select()
+    .from(flashcardsTable)
+    .where(eq(flashcardsTable.id, flashcardId))
+    .limit(1);
+
+  if (!flashcard) {
+    return null;
+  }
+
+  // Verify the user owns the deck that contains this flashcard
+  const deck = await getDeckById(flashcard.deckId);
+  if (!deck) {
+    return null;
+  }
+
+  return flashcard;
+}
+
+/**
+ * Update a flashcard's content
+ */
+export async function updateFlashcard(flashcardId: string, front: string, back: string) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error("Authentication required to update flashcard");
+  }
+
+  // Verify the user owns this flashcard by checking the deck
+  const existingCard = await getFlashcardById(flashcardId);
+  if (!existingCard) {
+    throw new Error("Flashcard not found or access denied");
+  }
+
+  const [updatedCard] = await db
+    .update(flashcardsTable)
+    .set({
+      front,
+      back,
+      updatedAt: new Date(),
+    })
+    .where(eq(flashcardsTable.id, flashcardId))
+    .returning();
+
+  // Update the deck's updatedAt timestamp
+  await db
+    .update(decksTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(decksTable.id, existingCard.deckId));
+  
+  return updatedCard;
+}
+
+/**
+ * Delete a flashcard
+ */
+export async function deleteFlashcard(flashcardId: string): Promise<boolean> {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    throw new Error("Authentication required to delete flashcard");
+  }
+
+  // Get the flashcard first to get the deckId
+  const existingCard = await getFlashcardById(flashcardId);
+  if (!existingCard) {
+    throw new Error("Flashcard not found or access denied");
+  }
+
+  const result = await db
+    .delete(flashcardsTable)
+    .where(eq(flashcardsTable.id, flashcardId))
+    .returning({ id: flashcardsTable.id });
+
+  if (result.length > 0) {
+    // Update the deck's card count
+    await updateDeckCardCount(existingCard.deckId);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Create a new flashcard in a deck
  */
 export async function createFlashcard(deckId: string, front: string, back: string) {

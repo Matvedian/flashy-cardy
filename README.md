@@ -77,7 +77,7 @@ bun dev
 1. **Sign up/Sign in** using Clerk authentication
 2. **Create flashcard decks** organized by topic or subject
 3. **Add flashcards** with front and back content
-4. **Use auto-translation** - Toggle "AI Assistance" when creating cards to automatically translate between languages
+4. **Use auto-translation** - Toggle "Auto-Translation" when creating cards to automatically translate between languages
 5. **Study your decks** with the smart study system
 6. **Track your progress** with built-in analytics
 

@@ -22,11 +22,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Loader2, Sparkles, ArrowLeftRight, RefreshCw, BookOpen } from "lucide-react";
-import { createFlashcardAction, type CreateFlashcardInput } from "@/actions/flashcard-actions";
+import { Edit, Loader2, Sparkles, ArrowLeftRight, RefreshCw, BookOpen, Trash2 } from "lucide-react";
+import { updateFlashcardAction, deleteFlashcardAction, type UpdateFlashcardInput, type DeleteFlashcardInput } from "@/actions/flashcard-actions";
+import type { SelectFlashcard } from "@/db/schema";
 
-interface AddFlashcardDialogProps {
-  deckId: string;
+interface EditFlashcardDialogProps {
+  flashcard: SelectFlashcard;
   trigger?: React.ReactNode;
 }
 
@@ -71,24 +72,39 @@ interface BritishHistoryResponse {
   message: string;
 }
 
-export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps) {
+export function EditFlashcardDialog({ flashcard, trigger }: EditFlashcardDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
   const [autoTranslate, setAutoTranslate] = useState(false);
   const [autoBritishHistory, setAutoBritishHistory] = useState(false);
-  const [createReverse, setCreateReverse] = useState(false);
   const [fromLanguage, setFromLanguage] = useState<string>('en');
   const [toLanguage, setToLanguage] = useState<string>('es');
   const [formData, setFormData] = useState({
-    front: "",
-    back: "",
+    front: flashcard.front,
+    back: flashcard.back,
   });
   const [error, setError] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const router = useRouter();
+
+  // Reset form data when flashcard changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        front: flashcard.front,
+        back: flashcard.back,
+      });
+      setError(null);
+      setTranslationError(null);
+      setHistoryError(null);
+      setAutoTranslate(false);
+      setAutoBritishHistory(false);
+    }
+  }, [open, flashcard]);
 
   // Translation function
   const translateText = async (text: string, from: string, to: string): Promise<string> => {
@@ -186,7 +202,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
 
   // Auto-translate when front text changes (if auto-translation is enabled)
   useEffect(() => {
-    if (!autoTranslate || !formData.front.trim()) return;
+    if (!autoTranslate || !formData.front.trim() || formData.front === flashcard.front) return;
 
     const timeoutId = setTimeout(async () => {
       setIsTranslating(true);
@@ -203,11 +219,11 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
     }, 1000); // Debounce for 1 second
 
     return () => clearTimeout(timeoutId);
-  }, [formData.front, autoTranslate, fromLanguage, toLanguage]);
+  }, [formData.front, autoTranslate, fromLanguage, toLanguage, flashcard.front]);
 
   // Auto-generate British History answers when front text changes (if enabled)
   useEffect(() => {
-    if (!autoBritishHistory || !formData.front.trim()) return;
+    if (!autoBritishHistory || !formData.front.trim() || formData.front === flashcard.front) return;
 
     const timeoutId = setTimeout(async () => {
       setIsGeneratingAnswer(true);
@@ -224,7 +240,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
     }, 1000); // Debounce for 1 second
 
     return () => clearTimeout(timeoutId);
-  }, [formData.front, autoBritishHistory]);
+  }, [formData.front, autoBritishHistory, flashcard.front]);
 
   // Swap languages
   const swapLanguages = () => {
@@ -245,41 +261,22 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
     setIsLoading(true);
     setError(null);
 
-    const primaryCard: CreateFlashcardInput = {
-      deckId,
+    const updateData: UpdateFlashcardInput = {
+      flashcardId: flashcard.id,
       front: formData.front.trim(),
       back: formData.back.trim(),
     };
 
     try {
-      // Create the primary flashcard
-      const result = await createFlashcardAction(primaryCard);
+      // Update the flashcard
+      const result = await updateFlashcardAction(updateData);
 
       if (!result.success) {
-        setError(result.error || "Failed to create flashcard");
+        setError(result.error || "Failed to update flashcard");
         return;
       }
 
-      // Create reverse card if requested
-      if (createReverse && formData.front.trim() !== formData.back.trim()) {
-        const reverseCard: CreateFlashcardInput = {
-          deckId,
-          front: formData.back.trim(),
-          back: formData.front.trim(),
-        };
-
-        const reverseResult = await createFlashcardAction(reverseCard);
-        if (!reverseResult.success) {
-          console.warn("Failed to create reverse card:", reverseResult.error);
-          // Don't show this as an error since the primary card succeeded
-        }
-      }
-
       // Reset form and close dialog
-      setFormData({ front: "", back: "" });
-      setAutoTranslate(false);
-      setAutoBritishHistory(false);
-      setCreateReverse(false);
       setError(null);
       setTranslationError(null);
       setHistoryError(null);
@@ -289,10 +286,43 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
       router.refresh();
 
     } catch (error) {
-      console.error("Error creating flashcard:", error);
+      console.error("Error updating flashcard:", error);
       setError("An unexpected error occurred");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this flashcard? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError(null);
+
+    const deleteData: DeleteFlashcardInput = {
+      flashcardId: flashcard.id,
+      deckId: flashcard.deckId,
+    };
+
+    try {
+      const result = await deleteFlashcardAction(deleteData);
+
+      if (!result.success) {
+        setError(result.error || "Failed to delete flashcard");
+        return;
+      }
+
+      // Close dialog and refresh
+      setOpen(false);
+      router.refresh();
+
+    } catch (error) {
+      console.error("Error deleting flashcard:", error);
+      setError("An unexpected error occurred while deleting");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -305,29 +335,30 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
   };
 
   const isFormValid = formData.front.trim().length > 0 && formData.back.trim().length > 0;
+  const hasChanges = formData.front !== flashcard.front || formData.back !== flashcard.back;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button className="flex items-center space-x-2">
-            <Plus className="w-4 h-4" />
-            <span>Add Flashcard</span>
+          <Button variant="outline" size="sm" className="flex items-center space-x-2">
+            <Edit className="w-4 h-4" />
+            <span>Edit</span>
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
-            <span>Add New Flashcard</span>
+            <span>Edit Flashcard</span>
             {autoTranslate && <Sparkles className="w-4 h-4 text-blue-500" />}
             {autoBritishHistory && <BookOpen className="w-4 h-4 text-amber-600" />}
           </DialogTitle>
           <DialogDescription>
-            Create a new flashcard for this deck. 
+            Make changes to your flashcard content. 
             {autoTranslate && ' Auto-translation will help translate your content.'}
             {autoBritishHistory && ' British History mode will automatically generate answers to historical questions.'}
-            {!autoTranslate && !autoBritishHistory && ' Add content for both the front and back of the card.'}
+            {!autoTranslate && !autoBritishHistory && ' Update the content for both sides of the card.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -347,7 +378,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
                 setAutoTranslate(checked);
                 if (checked) setAutoBritishHistory(false); // Disable British History when translation is enabled
               }}
-              disabled={isLoading || autoBritishHistory}
+              disabled={isLoading || isDeleting || autoBritishHistory}
             />
           </div>
 
@@ -366,7 +397,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
                 setAutoBritishHistory(checked);
                 if (checked) setAutoTranslate(false); // Disable translation when British History is enabled
               }}
-              disabled={isLoading || autoTranslate}
+              disabled={isLoading || isDeleting || autoTranslate}
             />
           </div>
 
@@ -394,7 +425,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
                   variant="ghost"
                   size="sm"
                   onClick={swapLanguages}
-                  disabled={isLoading || isTranslating}
+                  disabled={isLoading || isDeleting || isTranslating}
                   className="px-2"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
@@ -446,7 +477,7 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
               value={formData.front}
               onChange={(e) => handleInputChange("front", e.target.value)}
               className="min-h-[80px]"
-              disabled={isLoading}
+              disabled={isLoading || isDeleting}
             />
           </div>
 
@@ -483,25 +514,9 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
               value={formData.back}
               onChange={(e) => handleInputChange("back", e.target.value)}
               className="min-h-[80px]"
-              disabled={isLoading || (autoTranslate && isTranslating) || (autoBritishHistory && isGeneratingAnswer)}
+              disabled={isLoading || isDeleting || (autoTranslate && isTranslating) || (autoBritishHistory && isGeneratingAnswer)}
             />
           </div>
-
-          {/* Create Reverse Card Option */}
-          {(autoTranslate || autoBritishHistory) && (
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={createReverse}
-                onCheckedChange={setCreateReverse}
-                disabled={isLoading}
-              />
-              <Label className="text-sm">
-                Create reverse card (
-                {autoTranslate ? 'both directions' : 'answer to question format'}
-                )
-              </Label>
-            </div>
-          )}
 
           {/* Errors */}
           {error && (
@@ -521,34 +536,46 @@ export function AddFlashcardDialog({ deckId, trigger }: AddFlashcardDialogProps)
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-between">
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isLoading || isTranslating || isGeneratingAnswer}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!isFormValid || isLoading || isTranslating || isGeneratingAnswer}
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isLoading || isDeleting || isTranslating || isGeneratingAnswer}
               className="flex items-center space-x-2"
             >
-              {(isLoading || isTranslating || isGeneratingAnswer) && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>
-                {isLoading 
-                  ? "Creating..." 
-                  : isTranslating 
-                    ? "Translating..." 
-                    : isGeneratingAnswer
-                      ? "Generating Answer..."
-                      : createReverse 
-                        ? "Add Cards" 
-                        : "Add Flashcard"
-                }
-              </span>
+              {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+              <Trash2 className="w-4 h-4" />
+              <span>{isDeleting ? "Deleting..." : "Delete"}</span>
             </Button>
+            
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={isLoading || isDeleting || isTranslating || isGeneratingAnswer}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!isFormValid || !hasChanges || isLoading || isDeleting || isTranslating || isGeneratingAnswer}
+                className="flex items-center space-x-2"
+              >
+                {(isLoading || isTranslating || isGeneratingAnswer) && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>
+                  {isLoading 
+                    ? "Updating..." 
+                    : isTranslating 
+                      ? "Translating..." 
+                      : isGeneratingAnswer
+                        ? "Generating Answer..."
+                        : "Update Flashcard"
+                  }
+                </span>
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

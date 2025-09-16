@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Plus, BookOpen, Calendar } from "lucide-react";
+import { ArrowLeft, Plus, BookOpen, Calendar, Edit } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddFlashcardDialog } from "@/components/AddFlashcardDialog";
+import { EditFlashcardDialog } from "@/components/EditFlashcardDialog";
 
 interface DeckPageProps {
   params: Promise<{
@@ -130,8 +131,22 @@ export default async function DeckPage({ params }: DeckPageProps) {
                         <Badge variant="outline" className="text-xs">
                           Card {index + 1}
                         </Badge>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(flashcard.createdAt).toLocaleDateString()}
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(flashcard.createdAt).toLocaleDateString()}
+                          </div>
+                          <EditFlashcardDialog
+                            flashcard={flashcard}
+                            trigger={
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-xs h-6 px-2"
+                              >
+                                Edit
+                              </Button>
+                            }
+                          />
                         </div>
                       </div>
                     </CardHeader>
